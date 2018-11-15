@@ -1,0 +1,2 @@
+pip install feedparser
+pip install newspaper3k
