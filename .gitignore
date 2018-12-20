@@ -1,0 +1,5 @@
+.idea/
+newsExtractor/.idea/
+newsExtractor/main/scraped_articles.json
+newsExtractor/venv/
+
