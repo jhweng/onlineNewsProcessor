@@ -5,11 +5,14 @@ from time import mktime
 from datetime import datetime
 from gensim import corpora
 from collections import defaultdict
-from pprint import pprint  # pretty-printer
+from pprint import pprint
 import json
 import objectpath
 from collections import namedtuple
 import os
+from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize, word_tokenize
+
 
 
 def _json_object_hook(d): return namedtuple('X', d.keys())(*d.values())
@@ -18,7 +21,7 @@ def json2obj(data): return json.loads(data, object_hook=_json_object_hook)
 
 
 # Set the limit for number of articles to download
-LIMIT = 3
+LIMIT = 1
 _comments = True
 
 data = {}
@@ -28,7 +31,7 @@ news_dir = 'news_json/'
 sources_urls = 'NewsPapers.json'
 
 
-
+# checking if folder exists and warning about overwritting
 if not os.path.exists(news_dir):
     if _comments:
         print('Creating folder '+ news_dir +' ...')
@@ -150,11 +153,29 @@ if _comments:
 for company, value in companies.items():
     if _comments:
         print('Extracting keywords from ' + news_dir + company + '.json')
+    # extracting only text part of news json structure into an array/tuple
     with open(news_dir + company + '.json', 'r') as myfile:
         data = json.loads(myfile.read())
         news_struct = objectpath.Tree(data['newspapers'])
         result_tuple = tuple(news_struct.execute('$..text'))
 
+    # remove common words and tokenize
+    stopWordsList = set(stopwords.words('english'))
+    texts = [[word for word in document.lower().split() if word not in stopWordsList]
+              for document in result_tuple]
+
+    frequency = defaultdict(int)
+    for text in texts:
+        for token in text:
+            frequency[token] += 1
+
+    # remove words that appear only minFreq times
+    minFrequence = 2
+    texts = [[token for token in text if frequency[token] > minFrequence]
+              for text in texts]
+
+
+    pprint(set(texts[0]))
 
 
 
