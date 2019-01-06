@@ -1,24 +1,31 @@
 import feedparser as fp
 import newspaper
+import json
+import objectpath
+import os
+import tweepy
+import csv
 from newspaper import Article
 from time import mktime
 from datetime import datetime
-from gensim import corpora
 from collections import defaultdict
 from pprint import pprint
-import json
-import objectpath
 from collections import namedtuple
-import os
 from nltk.corpus import stopwords
-from nltk.tokenize import sent_tokenize, word_tokenize
 
 
 
-def _json_object_hook(d): return namedtuple('X', d.keys())(*d.values())
-def json2obj(data): return json.loads(data, object_hook=_json_object_hook)
+def _json_object_hook(d):
+    return namedtuple('X', d.keys())(*d.values())
 
 
+def json2obj(data):
+    return json.loads(data, object_hook=_json_object_hook)
+
+"""
+# ==============================================================
+# ============  Extracting news from sources  ==================
+# ==============================================================
 
 # Set the limit for number of articles to download
 LIMIT = 1
@@ -147,7 +154,7 @@ if _comments:
     print('News extraction finished.')
 
 # ==============================================================
-# ==============================================================
+# ===========  Extracting keywords from news  ==================
 # ==============================================================
 
 for company, value in companies.items():
@@ -170,13 +177,46 @@ for company, value in companies.items():
             frequency[token] += 1
 
     # remove words that appear only minFreq times
-    minFrequence = 2
+    minFrequence = 6
     texts = [[token for token in text if frequency[token] > minFrequence]
               for text in texts]
 
 
-    pprint(set(texts[0]))
+    pprint(set(texts))
+"""
+
+# ==============================================================
+# ============  Extracting news from Twitter  ==================
+# ==============================================================
+
+consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
+consumer_secret = 'TmdWDiEwgdJnnNXxVsnqhOB5CizN5pqseUz4wPiraODr216RjM'
+access_token = '1058701211745091584-2SL7tz0JyhjkXhjzfwrt9TnyS31TvZ'
+access_token_secret = 'd96xByA6Uqlyt7uRo0iSzGWr1H5uIIn8ghCR6PRIiXRf0'
+
+_write_to_file = False
+
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+auth.set_access_token(access_token, access_token_secret)
+api = tweepy.API(auth)
 
 
+user = api.me()
+print('Tweepy API user: ' + user.name)
+
+
+if _write_to_file:
+    # Open/Create a file to append data
+    csvFile = open('qatar.csv', 'a')
+    # Use csv Writer
+    csvWriter = csv.writer(csvFile)
+else:
+    print('Write to csv file = ' + str(_write_to_file))
+
+for tweet in tweepy.Cursor(api.search, tweet_mode='extended',  q="QatarAirways", since="2018-12-03").items(4):
+    print(tweet.created_at)
+    print('  ' + tweet.full_text)
+    if _write_to_file:
+        csvWriter.writerow([tweet.created_at, tweet.full_text.encode('utf-8')])
 
 

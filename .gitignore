@@ -3,3 +3,4 @@ newsExtractor/.idea/
 newsExtractor/main/scraped_articles.json
 newsExtractor/venv/
 
+newsExtractor/main/news_json/
