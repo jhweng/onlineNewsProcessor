@@ -14,7 +14,6 @@ from collections import namedtuple
 from nltk.corpus import stopwords
 
 
-
 def _json_object_hook(d):
     return namedtuple('X', d.keys())(*d.values())
 
@@ -22,30 +21,48 @@ def _json_object_hook(d):
 def json2obj(data):
     return json.loads(data, object_hook=_json_object_hook)
 
-"""
-# ==============================================================
-# ============  Extracting news from sources  ==================
-# ==============================================================
+
+# =======================
+# === Main parameters ===
+# =======================
 
 # Set the limit for number of articles to download
-LIMIT = 1
+LIMIT = 3
+# Minimum frequency of a word to be consider as keyword
+minFrequence = 6
+# Number of tweets search
+num_of_tweets_search = 4
+# Toggle for cmd line runtime comments
 _comments = True
+
+# Tweepy authentication info
+consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
+consumer_secret = 'TmdWDiEwgdJnnNXxVsnqhOB5CizN5pqseUz4wPiraODr216RjM'
+access_token = '1058701211745091584-2SL7tz0JyhjkXhjzfwrt9TnyS31TvZ'
+access_token_secret = 'd96xByA6Uqlyt7uRo0iSzGWr1H5uIIn8ghCR6PRIiXRf0'
+
+# Write Twitter search results in csv file
+_write_to_file = False
 
 data = {}
 data['newspapers'] = {}
 
-news_dir = 'news_json/'
+news_dir = 'news/'
 sources_urls = 'NewsPapers.json'
 
+
+# ==============================================================
+# ============  Extracting news from sources  ==================
+# ==============================================================
 
 # checking if folder exists and warning about overwritting
 if not os.path.exists(news_dir):
     if _comments:
-        print('Creating folder '+ news_dir +' ...')
+        print('Creating folder ' + news_dir + ' ...')
         os.makedirs(news_dir)
 else:
     if _comments:
-        print('Folder '+news_dir +' already exists, same name files will be overwritten.')
+        print('Folder ' + news_dir + ' already exists, same name files will be overwritten.')
 
 # Loads the JSON files with news sites
 if _comments:
@@ -57,6 +74,12 @@ count = 1
 
 # Iterate through each news company
 for company, value in companies.items():
+    company_dir = news_dir + str(company) + '/'
+    if not os.path.exists(company_dir):
+        if _comments:
+            print('Creating folder ' + company_dir)
+        os.makedirs(company_dir)
+
     # If a RSS link is provided in the JSON file, this will be the first choice.
     # Reason for this is that, RSS feeds often give more consistent and correct data.
     if 'rss' in value:
@@ -143,7 +166,7 @@ for company, value in companies.items():
 
     # Finally it saves the articles as a JSON-file.
     try:
-        with open(news_dir + company + '.json', 'w') as outfile:
+        with open(company_dir + company + '.json', 'w') as outfile:
             json.dump(data, outfile)
     except Exception as e:
         print(e)
@@ -158,10 +181,11 @@ if _comments:
 # ==============================================================
 
 for company, value in companies.items():
+    company_dir = news_dir + str(company) + '/'
     if _comments:
-        print('Extracting keywords from ' + news_dir + company + '.json')
+        print('Extracting keywords from ' + company_dir + company + '.json')
     # extracting only text part of news json structure into an array/tuple
-    with open(news_dir + company + '.json', 'r') as myfile:
+    with open(company_dir + company + '.json', 'r') as myfile:
         data = json.loads(myfile.read())
         news_struct = objectpath.Tree(data['newspapers'])
         result_tuple = tuple(news_struct.execute('$..text'))
@@ -177,24 +201,25 @@ for company, value in companies.items():
             frequency[token] += 1
 
     # remove words that appear only minFreq times
-    minFrequence = 6
     texts = [[token for token in text if frequency[token] > minFrequence]
               for text in texts]
 
+    text_index = 0
+    sets_of_keywords = []
+    for text in texts:
+        text_index += 1
+        with open(company_dir + "keywords" + str(text_index) + ".txt", "w") as text_file:
+            for single_word in set(text):
+                print(single_word, file=text_file)
+        sets_of_keywords.append(set(text))
 
-    pprint(set(texts))
-"""
+
+    print("Keywords extracted to " + company_dir + "keywords.txt")
+
 
 # ==============================================================
 # ============  Extracting news from Twitter  ==================
 # ==============================================================
-
-consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
-consumer_secret = 'TmdWDiEwgdJnnNXxVsnqhOB5CizN5pqseUz4wPiraODr216RjM'
-access_token = '1058701211745091584-2SL7tz0JyhjkXhjzfwrt9TnyS31TvZ'
-access_token_secret = 'd96xByA6Uqlyt7uRo0iSzGWr1H5uIIn8ghCR6PRIiXRf0'
-
-_write_to_file = False
 
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
@@ -204,19 +229,34 @@ api = tweepy.API(auth)
 user = api.me()
 print('Tweepy API user: ' + user.name)
 
+keywords_set_index = 0
+for company, value in companies.items():
+    company_dir = news_dir + str(company) + '/'
+    keywords_set_index = 1
 
-if _write_to_file:
-    # Open/Create a file to append data
-    csvFile = open('qatar.csv', 'a')
-    # Use csv Writer
-    csvWriter = csv.writer(csvFile)
-else:
-    print('Write to csv file = ' + str(_write_to_file))
+    with open(company_dir + 'keywords' + str(keywords_set_index) + '.txt', 'r') as keyword_file:
+        keywords_list = keyword_file.read()
 
-for tweet in tweepy.Cursor(api.search, tweet_mode='extended',  q="QatarAirways", since="2018-12-03").items(4):
-    print(tweet.created_at)
-    print('  ' + tweet.full_text)
-    if _write_to_file:
-        csvWriter.writerow([tweet.created_at, tweet.full_text.encode('utf-8')])
+    for words_set in sets_of_keywords:
+        for single_word in words_set:
+            str_search_term = str_search_term + single_word + ' '
+
+        str_from_date = '2018-12-03'
+
+        if _write_to_file:
+            # Open/Create a file to append data
+            csvFile = open(company_dir + str_search_term, 'a')
+            # Use csv Writer
+            csvWriter = csv.writer(csvFile)
+        else:
+            print('Write to csv file = ' + str(_write_to_file))
+
+        print('Searching on Twitter using \'' + str_search_term + '\' ...')
+        for tweet in tweepy.Cursor(api.search, tweet_mode='extended',
+                                   q=str_search_term, since=str_from_date).items(num_of_tweets_search):
+            print(tweet.created_at)
+            print('  ' + tweet.full_text)
+            if _write_to_file:
+                csvWriter.writerow([tweet.created_at, tweet.full_text.encode('utf-8')])
 
 
