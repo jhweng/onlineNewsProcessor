@@ -1,2 +1,10 @@
 pip install feedparser
 pip install newspaper3k
+pip install tweepy
+pip install objectpath
+
+
+python console:
+
+- import nltk
+- nltk.download('stopwords')
