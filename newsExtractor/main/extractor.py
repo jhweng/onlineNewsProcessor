@@ -5,6 +5,7 @@ import objectpath
 import os
 import tweepy
 import csv
+import operator
 from newspaper import Article
 from time import mktime
 from datetime import datetime
@@ -29,6 +30,8 @@ def remove_extra_chars(in_str):
     out_str = out_str.replace('?', '')
     out_str = out_str.replace('"', '')
     out_str = out_str.replace(':', '')
+    out_str = out_str.replace('(', '')
+    out_str = out_str.replace(')', '')
     return out_str
 
 
@@ -42,13 +45,15 @@ def is_valid_word(in_word):
 # Set the limit for number of articles to download
 num_of_articles = 3
 # Minimum frequency of a word to be consider as keyword
-minFrequence = 6
+minFrequence = 8
 # Number of tweets search
 num_of_tweets_search = 4
 # Toggle for cmd line runtime comments
 _comments = True
 # To extract new news from source
 _do_extract_news = False
+# Number of most frequent keywords to be used in tweets search
+num_of_most_freq_keywords = 4
 
 # Tweepy authentication info
 consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
@@ -153,8 +158,8 @@ if _do_extract_news:
                     print(e)
                     print("continuing...")
                     continue
-                # Again, for consistency, if there is no found publish date the article will be skipped.
-                # After 10 downloaded articles from the same newspaper without publish date, the company will be skipped.
+                # Again, for consistency, if there is no found publish date the article will be skipped
+                # After 10 downloaded articles from the same newspaper without publish date, the company will be skipped
                 if content.publish_date is None:
                     if _comments:
                         print(count, " Article has date of type None...")
@@ -194,6 +199,8 @@ if _do_extract_news:
 else:
     with open(sources_urls) as data_file:
         companies = json.load(data_file)
+    if _comments:
+        print("Using existing news file.\n")
 
 # ==============================================================
 # ===========  Extracting keywords from news  ==================
@@ -215,28 +222,40 @@ for company, value in companies.items():
               for document in result_tuple]
 
     frequency = defaultdict(int)
+    text_index = 0
+    set_of_keywords = []
     for text in texts:
         for token in text:
             frequency[token] += 1
 
     # remove words that appear only minFreq times
-    texts = [[token for token in text if frequency[token] > minFrequence]
-              for text in texts]
+    # texts = [[token for token in text if frequency[token] > minFrequence]
+    #           for text in texts]
 
-    text_index = 0
-    for text in texts:
-        text_index += 1
-        sets_of_keywords = []
-        for single_word in set(text):
+    # for text in texts:
+    #     for single_word in set(text):
+    #         single_word = remove_extra_chars(single_word)
+    #         if single_word not in sets_of_keywords:
+    #             sets_of_keywords.append(single_word)
+
+        # Select most used keywords and save to file
+        for counter in range(num_of_most_freq_keywords):
+            # Get the top one used word in text
+            single_word = max(frequency.items(), key=operator.itemgetter(1))[0]
+            del frequency[single_word]
             single_word = remove_extra_chars(single_word)
-            if single_word not in sets_of_keywords:
-                sets_of_keywords.append(single_word)
-                # print(single_word, file=text_file)
-        # sets_of_keywords.append(set(text))
-        with open(company_dir + "keywords" + str(text_index) + ".txt", "w", encoding="utf-8") as text_file:
-            print(sets_of_keywords, file=text_file)
+            set_of_keywords.append(single_word)
 
-    print("Keywords extracted to " + company_dir + "keywords.txt")
+        with open(company_dir + "news" + str(text_index+1) + ".txt", "w", encoding="utf-8") as news_text_file:
+            print(str(result_tuple[text_index]), file=news_text_file)
+        with open(company_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
+            for keyword in set_of_keywords:
+                print(keyword, file=keywords_text_file)
+        text_index += 1
+        set_of_keywords = []
+        frequency.clear()
+
+    print("Keywords extracted to " + company_dir + "keywords.txt\n")
 
 
 # ==============================================================
@@ -257,16 +276,15 @@ for company, value in companies.items():
 
     for article_index in range(num_of_articles):
         print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
-        with open(company_dir + 'keywords' + str(article_index+1) + '.txt', 'r') as keyword_file:
+        with open(company_dir + "news" + str(article_index+1) + "_keywords.txt", 'r') as keyword_file:
             str_search_term = keyword_file.read().replace('\n', ' ')
+        str_search_term.strip()
 
         if _write_to_file:
             # Open/Create a file to append data
             csvFile = open(company_dir + str_search_term, 'a')
             # Use csv Writer
             csvWriter = csv.writer(csvFile)
-        else:
-            print('Write to csv file = ' + str(_write_to_file))
 
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
@@ -276,11 +294,12 @@ for company, value in companies.items():
             tweets_index += 1
             print(tweet.created_at)
             print('  ' + tweet.full_text)
-            print('Printing to text file...')
-            with open(company_dir + 'Tweet' + str(tweets_index) + '_of_news_' +
-                      str(article_index) + '.txt', "w") as tweet_file:
-                # tweet_file.write(tweet.created_at + '   ' + tweet.full_text)
-                tweet_file.write('test printing to file')
+            print('Printing to text file...\n')
+            with open(company_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
+                      '.txt', "w", encoding="utf-8") as tweet_file:
+                tweet_file.write(str(tweet.created_at))
+                tweet_file.write('\n')
+                tweet_file.write(str(tweet.full_text))
 
             if _write_to_file:
                 csvWriter.writerow([tweet.created_at, tweet.full_text.encode('utf-8')])
