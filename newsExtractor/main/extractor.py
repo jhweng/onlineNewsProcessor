@@ -4,10 +4,11 @@ import json
 import objectpath
 import os
 import tweepy
-import csv
 import operator
-from newspaper import Article
 from time import mktime
+from tkinter import *
+from tkinter import ttk
+from newspaper import Article
 from datetime import datetime
 from collections import defaultdict
 from collections import namedtuple
@@ -37,6 +38,7 @@ def remove_extra_chars(in_str):
 
 def is_valid_word(in_word):
     return in_word != '-'
+
 
 # =======================
 # === Main parameters ===
@@ -280,12 +282,6 @@ for company, value in companies.items():
             str_search_term = keyword_file.read().replace('\n', ' ')
         str_search_term.strip()
 
-        if _write_to_file:
-            # Open/Create a file to append data
-            csvFile = open(company_dir + str_search_term, 'a')
-            # Use csv Writer
-            csvWriter = csv.writer(csvFile)
-
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
         tweets_index = 0
@@ -294,14 +290,49 @@ for company, value in companies.items():
             tweets_index += 1
             print(tweet.created_at)
             print('  ' + tweet.full_text)
-            print('Printing to text file...\n')
+            print('Printing tweet to text file\n')
             with open(company_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
                       '.txt', "w", encoding="utf-8") as tweet_file:
                 tweet_file.write(str(tweet.created_at))
                 tweet_file.write('\n')
                 tweet_file.write(str(tweet.full_text))
 
-            if _write_to_file:
-                csvWriter.writerow([tweet.created_at, tweet.full_text.encode('utf-8')])
 
+# printing news and tweets from search result in a window for comparing
+window = Tk()
+window.title("Twitter News Processing")
+window.geometry('350x200')
+for company, value in companies.items():
+    company_dir = news_dir + str(company) + '/'
+    for article_index in range(num_of_articles):
+        print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
+        with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
+            str_news_text = str(news_text_file.read()).replace('\n', '')
+        for tweets_index in range(num_of_tweets_search):
+            with open(company_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
+                      ".txt", 'r', encoding="utf-8") as tweet_text_file:
+                str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
+                # str_tweet_text = ' '.join(e for e in str_tweet_text if e.isalnum())
+                str_tweet_text = [re.sub(r"[^a-zA-Z0-9]+", ' ', k) for k in str_tweet_text.split("\n")]
+
+            tab_control = ttk.Notebook(window)
+            tab1 = ttk.Frame(tab_control)
+            tab2 = ttk.Frame(tab_control)
+
+            tab_control.add(tab1, text='News' + str(article_index+1))
+            txt1 = Text(tab1)
+            txt1.pack()
+            txt1.insert(END, str_news_text)
+            txt1.config(state=DISABLED)
+            txt1.grid(column=0, row=0)
+
+            tab_control.add(tab2, text='Tweet' + str(tweets_index+1))
+            txt2 = Text(tab2)
+            txt2.pack()
+            txt2.insert(END, str_tweet_text)
+            txt2.config(state=DISABLED)
+            txt2.grid(column=0, row=0)
+
+            tab_control.pack(expand=1, fill='both')
+            window.mainloop()
 
