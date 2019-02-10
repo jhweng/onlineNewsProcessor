@@ -47,15 +47,17 @@ def is_valid_word(in_word):
 # Set the limit for number of articles to download
 num_of_articles = 3
 # Minimum frequency of a word to be consider as keyword
-minFrequence = 8
+# minFrequence = 8
 # Number of tweets search
-num_of_tweets_search = 4
+num_of_tweets_search = 20
 # Toggle for cmd line runtime comments
 _comments = True
 # To extract new news from source
 _do_extract_news = False
+# To display the final result in a window
+_display_results = False
 # Number of most frequent keywords to be used in tweets search
-num_of_most_freq_keywords = 4
+num_of_most_freq_keywords = 3
 
 # Tweepy authentication info
 consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
@@ -70,6 +72,7 @@ data = {}
 data['newspapers'] = {}
 
 news_dir = 'news/'
+keywords_dir = str(num_of_most_freq_keywords) + '_keywords/'
 sources_urls = 'NewsPapers.json'
 
 
@@ -230,17 +233,7 @@ for company, value in companies.items():
         for token in text:
             frequency[token] += 1
 
-    # remove words that appear only minFreq times
-    # texts = [[token for token in text if frequency[token] > minFrequence]
-    #           for text in texts]
-
-    # for text in texts:
-    #     for single_word in set(text):
-    #         single_word = remove_extra_chars(single_word)
-    #         if single_word not in sets_of_keywords:
-    #             sets_of_keywords.append(single_word)
-
-        # Select most used keywords and save to file
+        # Select #n most used keywords and save to file
         for counter in range(num_of_most_freq_keywords):
             # Get the top one used word in text
             single_word = max(frequency.items(), key=operator.itemgetter(1))[0]
@@ -248,16 +241,22 @@ for company, value in companies.items():
             single_word = remove_extra_chars(single_word)
             set_of_keywords.append(single_word)
 
-        with open(company_dir + "news" + str(text_index+1) + ".txt", "w", encoding="utf-8") as news_text_file:
+        # printing news text and keywords to file
+        if not os.path.exists(company_dir + keywords_dir):
+            if _comments:
+                print('Creating folder ' + company_dir + keywords_dir)
+            os.makedirs(company_dir + keywords_dir)
+
+        with open(company_dir + keywords_dir + "news" + str(text_index+1) + ".txt", "w", encoding="utf-8") as news_text_file:
             print(str(result_tuple[text_index]), file=news_text_file)
-        with open(company_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
+        with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
             for keyword in set_of_keywords:
                 print(keyword, file=keywords_text_file)
         text_index += 1
         set_of_keywords = []
         frequency.clear()
 
-    print("Keywords extracted to " + company_dir + "keywords.txt\n")
+    print("Keywords extracted to " + company_dir + keywords_dir + "keywords.txt\n")
 
 
 # ==============================================================
@@ -278,7 +277,7 @@ for company, value in companies.items():
 
     for article_index in range(num_of_articles):
         print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
-        with open(company_dir + "news" + str(article_index+1) + "_keywords.txt", 'r') as keyword_file:
+        with open(company_dir + keywords_dir + "news" + str(article_index+1) + "_keywords.txt", 'r') as keyword_file:
             str_search_term = keyword_file.read().replace('\n', ' ')
         str_search_term.strip()
 
@@ -291,7 +290,7 @@ for company, value in companies.items():
             print(tweet.created_at)
             print('  ' + tweet.full_text)
             print('Printing tweet to text file\n')
-            with open(company_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
+            with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
                       '.txt', "w", encoding="utf-8") as tweet_file:
                 tweet_file.write(str(tweet.created_at))
                 tweet_file.write('\n')
@@ -299,40 +298,41 @@ for company, value in companies.items():
 
 
 # printing news and tweets from search result in a window for comparing
-window = Tk()
-window.title("Twitter News Processing")
-window.geometry('350x200')
-for company, value in companies.items():
-    company_dir = news_dir + str(company) + '/'
-    for article_index in range(num_of_articles):
-        print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
-        with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
-            str_news_text = str(news_text_file.read()).replace('\n', '')
-        for tweets_index in range(num_of_tweets_search):
-            with open(company_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
-                      ".txt", 'r', encoding="utf-8") as tweet_text_file:
-                str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
-                # str_tweet_text = ' '.join(e for e in str_tweet_text if e.isalnum())
-                str_tweet_text = [re.sub(r"[^a-zA-Z0-9]+", ' ', k) for k in str_tweet_text.split("\n")]
+if _display_results:
+    window = Tk()
+    window.title("Twitter News Processing")
+    window.geometry('350x200')
+    for company, value in companies.items():
+        company_dir = news_dir + str(company) + '/'
+        for article_index in range(num_of_articles):
+            print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
+            with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
+                str_news_text = str(news_text_file.read()).replace('\n', '')
+            for tweets_index in range(num_of_tweets_search):
+                with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
+                          ".txt", 'r', encoding="utf-8") as tweet_text_file:
+                    str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
+                    # str_tweet_text = ' '.join(e for e in str_tweet_text if e.isalnum())
+                    str_tweet_text = [re.sub(r"[^a-zA-Z0-9]+", ' ', k) for k in str_tweet_text.split("\n")]
 
-            tab_control = ttk.Notebook(window)
-            tab1 = ttk.Frame(tab_control)
-            tab2 = ttk.Frame(tab_control)
+                tab_control = ttk.Notebook(window)
+                tab1 = ttk.Frame(tab_control)
+                tab2 = ttk.Frame(tab_control)
 
-            tab_control.add(tab1, text='News' + str(article_index+1))
-            txt1 = Text(tab1)
-            txt1.pack()
-            txt1.insert(END, str_news_text)
-            txt1.config(state=DISABLED)
-            txt1.grid(column=0, row=0)
+                tab_control.add(tab1, text='News' + str(article_index+1))
+                txt1 = Text(tab1)
+                txt1.pack()
+                txt1.insert(END, str_news_text)
+                txt1.config(state=DISABLED)
+                txt1.grid(column=0, row=0)
 
-            tab_control.add(tab2, text='Tweet' + str(tweets_index+1))
-            txt2 = Text(tab2)
-            txt2.pack()
-            txt2.insert(END, str_tweet_text)
-            txt2.config(state=DISABLED)
-            txt2.grid(column=0, row=0)
+                tab_control.add(tab2, text='Tweet' + str(tweets_index+1))
+                txt2 = Text(tab2)
+                txt2.pack()
+                txt2.insert(END, str_tweet_text)
+                txt2.config(state=DISABLED)
+                txt2.grid(column=0, row=0)
 
-            tab_control.pack(expand=1, fill='both')
-            window.mainloop()
+                tab_control.pack(expand=1, fill='both')
+                window.mainloop()
 
