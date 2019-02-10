@@ -57,7 +57,9 @@ _do_extract_news = False
 # To display the final result in a window
 _display_results = False
 # Number of most frequent keywords to be used in tweets search
-num_of_most_freq_keywords = 3
+num_of_most_freq_keywords = 4
+# Searching tweets from date
+str_from_date = '2019-01-23'
 
 # Tweepy authentication info
 consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
@@ -74,6 +76,7 @@ data['newspapers'] = {}
 news_dir = 'news/'
 keywords_dir = str(num_of_most_freq_keywords) + '_keywords/'
 sources_urls = 'NewsPapers.json'
+str_retweet_filter = ' -filter:retweets'
 
 
 # ==============================================================
@@ -273,7 +276,6 @@ print('Tweepy API user: ' + user.name)
 
 for company, value in companies.items():
     company_dir = news_dir + str(company) + '/'
-    str_from_date = '2019-01-23'
 
     for article_index in range(num_of_articles):
         print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
@@ -284,8 +286,8 @@ for company, value in companies.items():
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
         tweets_index = 0
-        for tweet in tweepy.Cursor(api.search, tweet_mode='extended',
-                                   q=str_search_term, since=str_from_date).items(num_of_tweets_search):
+        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term + str_retweet_filter,
+                                   since=str_from_date).items(num_of_tweets_search):
             tweets_index += 1
             print(tweet.created_at)
             print('  ' + tweet.full_text)
