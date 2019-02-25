@@ -56,8 +56,10 @@ _comments = True
 _do_extract_news = False
 # To display the final result in a window
 _display_results = False
+# Tweets searching method
+_search_by_hashtags = False
 # Number of most frequent keywords to be used in tweets search
-num_of_most_freq_keywords = 4
+num_of_most_freq_keywords = 3
 # Searching tweets from date
 str_from_date = '2019-01-23'
 
@@ -222,7 +224,10 @@ for company, value in companies.items():
     with open(company_dir + company + '.json', 'r') as myfile:
         data = json.loads(myfile.read())
         news_struct = objectpath.Tree(data['newspapers'])
+        # extracting news links titles and text from news_struct
         result_tuple = tuple(news_struct.execute('$..text'))
+        news_links = tuple(news_struct.execute('$..link'))
+        news_titles = tuple(news_struct.execute('$..title'))
 
     # remove common words and tokenize
     stopWordsList = set(stopwords.words('english'))
@@ -251,6 +256,9 @@ for company, value in companies.items():
             os.makedirs(company_dir + keywords_dir)
 
         with open(company_dir + keywords_dir + "news" + str(text_index+1) + ".txt", "w", encoding="utf-8") as news_text_file:
+            # lets remove the first link which regards to the source link
+            print(str(news_links[text_index + 1]) + '\n\n', file=news_text_file)
+            print('***' + str(news_titles[text_index]) + '***\n', file=news_text_file)
             print(str(result_tuple[text_index]), file=news_text_file)
         with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
             for keyword in set_of_keywords:
@@ -279,9 +287,16 @@ for company, value in companies.items():
 
     for article_index in range(num_of_articles):
         print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
-        with open(company_dir + keywords_dir + "news" + str(article_index+1) + "_keywords.txt", 'r') as keyword_file:
-            str_search_term = keyword_file.read().replace('\n', ' ')
-        str_search_term.strip()
+        str_search_term = ''
+        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_keywords.txt", 'r') as keyword_file:
+            if _search_by_hashtags:
+                str_search_term = '#'
+                str_search_term = str_search_term + keyword_file.read().replace('\n', ' #')
+                # str_search_term.strip()
+            else:
+                # creating keywords by appending most freq words
+                str_search_term = keyword_file.read().replace('\n', ' ')
+                str_search_term.strip()
 
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
