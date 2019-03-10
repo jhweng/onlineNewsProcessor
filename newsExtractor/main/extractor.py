@@ -56,18 +56,20 @@ _comments = True
 _do_extract_news = False
 # To display the final result in a window
 _display_results = False
+# to filter out retweets from search results
+_do_filter_retweets = True
 # Tweets searching method
 _search_by_hashtags = False
 # Number of most frequent keywords to be used in tweets search
-num_of_most_freq_keywords = 3
+num_of_most_freq_keywords = 4
 # Searching tweets from date
-str_from_date = '2019-01-23'
+str_from_date = '2019-01-01'
 
 # Tweepy authentication info
-consumer_key = 'Jrn5QqyUTfPZFfn91kqHLDFTi'
-consumer_secret = 'TmdWDiEwgdJnnNXxVsnqhOB5CizN5pqseUz4wPiraODr216RjM'
-access_token = '1058701211745091584-2SL7tz0JyhjkXhjzfwrt9TnyS31TvZ'
-access_token_secret = 'd96xByA6Uqlyt7uRo0iSzGWr1H5uIIn8ghCR6PRIiXRf0'
+consumer_key = ''
+consumer_secret = ''
+access_token = ''
+access_token_secret = ''
 
 # Write Twitter search results in csv file
 _write_to_file = False
@@ -221,7 +223,7 @@ for company, value in companies.items():
     if _comments:
         print('Extracting keywords from ' + company_dir + company + '.json')
     # extracting only text part of news json structure into an array/tuple
-    with open(company_dir + company + '.json', 'r') as myfile:
+    with open(company_dir + company + '.json', 'r', encoding="utf-8") as myfile:
         data = json.loads(myfile.read())
         news_struct = objectpath.Tree(data['newspapers'])
         # extracting news links titles and text from news_struct
@@ -288,7 +290,7 @@ for company, value in companies.items():
     for article_index in range(num_of_articles):
         print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
         str_search_term = ''
-        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_keywords.txt", 'r') as keyword_file:
+        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_keywords.txt", 'r', encoding="utf-8") as keyword_file:
             if _search_by_hashtags:
                 str_search_term = '#'
                 str_search_term = str_search_term + keyword_file.read().replace('\n', ' #')
@@ -296,12 +298,14 @@ for company, value in companies.items():
             else:
                 # creating keywords by appending most freq words
                 str_search_term = keyword_file.read().replace('\n', ' ')
-                str_search_term.strip()
+                str_search_term = str_search_term.strip()
 
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
         tweets_index = 0
-        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term + str_retweet_filter,
+        if _do_filter_retweets:
+            str_search_term = str_search_term + str_retweet_filter
+        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term,
                                    since=str_from_date).items(num_of_tweets_search):
             tweets_index += 1
             print(tweet.created_at)
