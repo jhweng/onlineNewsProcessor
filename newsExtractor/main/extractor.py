@@ -14,6 +14,10 @@ from collections import defaultdict
 from collections import namedtuple
 from nltk.corpus import stopwords
 
+import constants
+import twitterAuthentic
+import run_parameters as param
+
 
 def _json_object_hook(d):
     return namedtuple('X', d.keys())(*d.values())
@@ -40,45 +44,11 @@ def is_valid_word(in_word):
     return in_word != '-'
 
 
-# =======================
-# === Main parameters ===
-# =======================
-
-# Set the limit for number of articles to download
-num_of_articles = 3
-# Minimum frequency of a word to be consider as keyword
-# minFrequence = 8
-# Number of tweets search
-num_of_tweets_search = 20
-# Toggle for cmd line runtime comments
-_comments = True
-# To extract new news from source
-_do_extract_news = False
-# To display the final result in a window
-_display_results = False
-# to filter out retweets from search results
-_do_filter_retweets = True
-# Tweets searching method
-_search_by_hashtags = False
-# Number of most frequent keywords to be used in tweets search
-num_of_most_freq_keywords = 4
-# Searching tweets from date
-str_from_date = '2019-01-01'
-
-# Tweepy authentication info
-consumer_key = ''
-consumer_secret = ''
-access_token = ''
-access_token_secret = ''
-
-# Write Twitter search results in csv file
-_write_to_file = False
-
 data = {}
 data['newspapers'] = {}
 
 news_dir = 'news/'
-keywords_dir = str(num_of_most_freq_keywords) + '_keywords/'
+keywords_dir = str(param.mostFreqKeywords) + '_keywords/'
 sources_urls = 'NewsPapers.json'
 str_retweet_filter = ' -filter:retweets'
 
@@ -86,18 +56,18 @@ str_retweet_filter = ' -filter:retweets'
 # ==============================================================
 # ============  Extracting news from sources  ==================
 # ==============================================================
-if _do_extract_news:
+if param._do_extract_news:
     # checking if folder exists and warning about overwritting
     if not os.path.exists(news_dir):
-        if _comments:
+        if param._comments:
             print('Creating folder ' + news_dir + ' ...')
             os.makedirs(news_dir)
     else:
-        if _comments:
+        if param._comments:
             print('Folder ' + news_dir + ' already exists, same name files will be overwritten.')
 
     # Loads the JSON files with news sites
-    if _comments:
+    if param._comments:
         print('Loading news sources ...')
     with open(sources_urls) as data_file:
         companies = json.load(data_file)
@@ -108,7 +78,7 @@ if _do_extract_news:
     for company, value in companies.items():
         company_dir = news_dir + str(company) + '/'
         if not os.path.exists(company_dir):
-            if _comments:
+            if param._comments:
                 print('Creating folder ' + company_dir)
             os.makedirs(company_dir)
 
@@ -116,7 +86,7 @@ if _do_extract_news:
         # Reason for this is that, RSS feeds often give more consistent and correct data.
         if 'rss' in value:
             d = fp.parse(value['rss'])
-            if _comments:
+            if param._comments:
                 print("Downloading articles from ", company)
             newsPaper = {
                 "rss": value['rss'],
@@ -127,7 +97,7 @@ if _do_extract_news:
                 # Check if publish date is provided, if no the article is skipped.
                 # This is done to keep consistency in the data and to keep the script from crashing.
                 if hasattr(entry, 'published'):
-                    if count > num_of_articles:
+                    if count > param.num_of_articles:
                         break
                     article = {}
                     article['link'] = entry.link
@@ -146,13 +116,13 @@ if _do_extract_news:
                     article['title'] = content.title
                     article['text'] = content.text
                     newsPaper['articles'].append(article)
-                    if _comments:
+                    if param._comments:
                         print(count, "articles downloaded from", company, ", url: ", entry.link)
                     count = count + 1
         else:
             # This is the fallback method if a RSS-feed link is not provided.
             # It uses the python newspaper library to extract articles
-            if _comments:
+            if param._comments:
                 print("Building site for ", company)
             paper = newspaper.build(value['link'], memoize_articles=False)
             newsPaper = {
@@ -161,7 +131,7 @@ if _do_extract_news:
             }
             noneTypeCount = 0
             for content in paper.articles:
-                if count > num_of_articles:
+                if count > param.num_of_articles:
                     break
                 try:
                     content.download()
@@ -173,11 +143,11 @@ if _do_extract_news:
                 # Again, for consistency, if there is no found publish date the article will be skipped
                 # After 10 downloaded articles from the same newspaper without publish date, the company will be skipped
                 if content.publish_date is None:
-                    if _comments:
+                    if param._comments:
                         print(count, " Article has date of type None...")
                     noneTypeCount = noneTypeCount + 1
                     if noneTypeCount > 10:
-                        if _comments:
+                        if param._comments:
                             print("Too many noneType dates, aborting...")
                         noneTypeCount = 0
                         break
@@ -189,7 +159,7 @@ if _do_extract_news:
                 article['link'] = content.url
                 article['published'] = content.publish_date.isoformat()
                 newsPaper['articles'].append(article)
-                if _comments:
+                if param._comments:
                     print(count, "articles downloaded from", company, " using newspaper, url: ", content.url)
                 count = count + 1
                 noneTypeCount = 0
@@ -205,13 +175,13 @@ if _do_extract_news:
 
         data['newspapers'] = {}
 
-    if _comments:
+    if param._comments:
         print('News extraction finished.\n')
 
 else:
     with open(sources_urls) as data_file:
         companies = json.load(data_file)
-    if _comments:
+    if param._comments:
         print("Using existing news file.\n")
 
 # ==============================================================
@@ -220,7 +190,7 @@ else:
 
 for company, value in companies.items():
     company_dir = news_dir + str(company) + '/'
-    if _comments:
+    if param._comments:
         print('Extracting keywords from ' + company_dir + company + '.json')
     # extracting only text part of news json structure into an array/tuple
     with open(company_dir + company + '.json', 'r', encoding="utf-8") as myfile:
@@ -244,7 +214,7 @@ for company, value in companies.items():
             frequency[token] += 1
 
         # Select #n most used keywords and save to file
-        for counter in range(num_of_most_freq_keywords):
+        for counter in range(param.mostFreqKeywords):
             # Get the top one used word in text
             single_word = max(frequency.items(), key=operator.itemgetter(1))[0]
             del frequency[single_word]
@@ -253,7 +223,7 @@ for company, value in companies.items():
 
         # printing news text and keywords to file
         if not os.path.exists(company_dir + keywords_dir):
-            if _comments:
+            if param._comments:
                 print('Creating folder ' + company_dir + keywords_dir)
             os.makedirs(company_dir + keywords_dir)
 
@@ -276,8 +246,8 @@ for company, value in companies.items():
 # ============  Extracting news from Twitter  ==================
 # ==============================================================
 
-auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-auth.set_access_token(access_token, access_token_secret)
+auth = tweepy.OAuthHandler(twitterAuthentic.consumer_key, twitterAuthentic.consumer_secret)
+auth.set_access_token(twitterAuthentic.access_token, twitterAuthentic.access_token_secret)
 api = tweepy.API(auth)
 
 
@@ -287,11 +257,11 @@ print('Tweepy API user: ' + user.name)
 for company, value in companies.items():
     company_dir = news_dir + str(company) + '/'
 
-    for article_index in range(num_of_articles):
+    for article_index in range(param.num_of_articles):
         print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
         str_search_term = ''
         with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_keywords.txt", 'r', encoding="utf-8") as keyword_file:
-            if _search_by_hashtags:
+            if param._search_by_hashtags:
                 str_search_term = '#'
                 str_search_term = str_search_term + keyword_file.read().replace('\n', ' #')
                 # str_search_term.strip()
@@ -303,10 +273,10 @@ for company, value in companies.items():
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
         tweets_index = 0
-        if _do_filter_retweets:
+        if param._do_filter_retweets:
             str_search_term = str_search_term + str_retweet_filter
         for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term,
-                                   since=str_from_date).items(num_of_tweets_search):
+                                   since=param.str_from_date).items(param.num_of_tweets_search):
             tweets_index += 1
             print(tweet.created_at)
             print('  ' + tweet.full_text)
@@ -319,17 +289,17 @@ for company, value in companies.items():
 
 
 # printing news and tweets from search result in a window for comparing
-if _display_results:
+if param._display_results:
     window = Tk()
     window.title("Twitter News Processing")
     window.geometry('350x200')
     for company, value in companies.items():
         company_dir = news_dir + str(company) + '/'
-        for article_index in range(num_of_articles):
+        for article_index in range(param.num_of_articles):
             print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
             with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
                 str_news_text = str(news_text_file.read()).replace('\n', '')
-            for tweets_index in range(num_of_tweets_search):
+            for tweets_index in range(param.num_of_tweets_search):
                 with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
                           ".txt", 'r', encoding="utf-8") as tweet_text_file:
                     str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
