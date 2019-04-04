@@ -6,13 +6,14 @@ import os
 import tweepy
 import operator
 from time import mktime
-from tkinter import *
-from tkinter import ttk
+# from tkinter import *
+# from tkinter import ttk
 from newspaper import Article
 from datetime import datetime
 from collections import defaultdict
 from collections import namedtuple
 from nltk.corpus import stopwords
+from difflib import SequenceMatcher
 
 import constants
 import twitterAuthentic
@@ -42,6 +43,10 @@ def remove_extra_chars(in_str):
 
 def is_valid_word(in_word):
     return in_word != '-'
+
+
+def similar(a, b):
+    return SequenceMatcher(None, a, b).ratio()
 
 
 data = {}
@@ -270,60 +275,71 @@ for company, value in companies.items():
                 str_search_term = keyword_file.read().replace('\n', ' ')
                 str_search_term = str_search_term.strip()
 
+        str_search_term = str_search_term[:-2]
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
         tweets_index = 0
+        search_results = []
         if param._do_filter_retweets:
             str_search_term = str_search_term + str_retweet_filter
         for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term,
                                    since=param.str_from_date).items(param.num_of_tweets_search):
             tweets_index += 1
-            print(tweet.created_at)
-            print('  ' + tweet.full_text)
-            print('Printing tweet to text file\n')
-            with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
-                      '.txt', "w", encoding="utf-8") as tweet_file:
-                tweet_file.write(str(tweet.created_at))
-                tweet_file.write('\n')
-                tweet_file.write(str(tweet.full_text))
+            duplicated_result = False
+
+            for single_tweet in search_results:
+                print('similarity = ' + str(similar(single_tweet, tweet.full_text)))
+                if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
+                    duplicated_result = True
+
+            if not duplicated_result:
+                search_results.append(tweet.full_text)
+                print(tweet.created_at)
+                print('  ' + tweet.full_text)
+                print('Printing tweet to text file\n')
+                with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
+                          '.txt', "w", encoding="utf-8") as tweet_file:
+                    tweet_file.write(str(tweet.created_at))
+                    tweet_file.write('\n')
+                    tweet_file.write(str(tweet.full_text))
 
 
-# printing news and tweets from search result in a window for comparing
-if param._display_results:
-    window = Tk()
-    window.title("Twitter News Processing")
-    window.geometry('350x200')
-    for company, value in companies.items():
-        company_dir = news_dir + str(company) + '/'
-        for article_index in range(param.num_of_articles):
-            print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
-            with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
-                str_news_text = str(news_text_file.read()).replace('\n', '')
-            for tweets_index in range(param.num_of_tweets_search):
-                with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
-                          ".txt", 'r', encoding="utf-8") as tweet_text_file:
-                    str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
-                    # str_tweet_text = ' '.join(e for e in str_tweet_text if e.isalnum())
-                    str_tweet_text = [re.sub(r"[^a-zA-Z0-9]+", ' ', k) for k in str_tweet_text.split("\n")]
 
-                tab_control = ttk.Notebook(window)
-                tab1 = ttk.Frame(tab_control)
-                tab2 = ttk.Frame(tab_control)
-
-                tab_control.add(tab1, text='News' + str(article_index+1))
-                txt1 = Text(tab1)
-                txt1.pack()
-                txt1.insert(END, str_news_text)
-                txt1.config(state=DISABLED)
-                txt1.grid(column=0, row=0)
-
-                tab_control.add(tab2, text='Tweet' + str(tweets_index+1))
-                txt2 = Text(tab2)
-                txt2.pack()
-                txt2.insert(END, str_tweet_text)
-                txt2.config(state=DISABLED)
-                txt2.grid(column=0, row=0)
-
-                tab_control.pack(expand=1, fill='both')
-                window.mainloop()
+# # printing news and tweets from search result in a window for comparing
+# if param._display_results:
+#     window = Tk()
+#     window.title("Twitter News Processing")
+#     window.geometry('350x200')
+#     for company, value in companies.items():
+#         company_dir = news_dir + str(company) + '/'
+#         for article_index in range(param.num_of_articles):
+#             print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
+#             with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
+#                 str_news_text = str(news_text_file.read()).replace('\n', '')
+#             for tweets_index in range(param.num_of_tweets_search):
+#                 with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
+#                           ".txt", 'r', encoding="utf-8") as tweet_text_file:
+#                     str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
+#                     str_tweet_text = [re.sub(r"[^a-zA-Z0-9]+", ' ', k) for k in str_tweet_text.split("\n")]
+#
+#                 tab_control = ttk.Notebook(window)
+#                 tab1 = ttk.Frame(tab_control)
+#                 tab2 = ttk.Frame(tab_control)
+#
+#                 tab_control.add(tab1, text='News' + str(article_index+1))
+#                 txt1 = Text(tab1)
+#                 txt1.pack()
+#                 txt1.insert(END, str_news_text)
+#                 txt1.config(state=DISABLED)
+#                 txt1.grid(column=0, row=0)
+#
+#                 tab_control.add(tab2, text='Tweet' + str(tweets_index+1))
+#                 txt2 = Text(tab2)
+#                 txt2.pack()
+#                 txt2.insert(END, str_tweet_text)
+#                 txt2.config(state=DISABLED)
+#                 txt2.grid(column=0, row=0)
+#
+#                 tab_control.pack(expand=1, fill='both')
+#                 window.mainloop()
 
