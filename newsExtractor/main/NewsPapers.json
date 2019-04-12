@@ -1,6 +1,6 @@
 {
-  "bbc": {
-    "rss": "http://feeds.bbci.co.uk/news/rss.xml",
-    "link": "http://www.bbc.com/"
+  "reuters": {
+    "rss": "http://feeds.reuters.com/reuters/topNews",
+    "link": "http://www.reuters.com/"
   }
 }

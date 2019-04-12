@@ -61,6 +61,14 @@ str_retweet_filter = ' -filter:retweets'
 # ==============================================================
 # ============  Extracting news from sources  ==================
 # ==============================================================
+
+# Loads the JSON files with news sites
+if param._comments:
+    print('Loading news sources ...')
+with open(sources_urls) as data_file:
+    companies = json.load(data_file)
+
+
 if param._do_extract_news:
     # checking if folder exists and warning about overwritting
     if not os.path.exists(news_dir):
@@ -70,12 +78,6 @@ if param._do_extract_news:
     else:
         if param._comments:
             print('Folder ' + news_dir + ' already exists, same name files will be overwritten.')
-
-    # Loads the JSON files with news sites
-    if param._comments:
-        print('Loading news sources ...')
-    with open(sources_urls) as data_file:
-        companies = json.load(data_file)
 
     count = 1
 
@@ -275,7 +277,7 @@ for company, value in companies.items():
                 str_search_term = keyword_file.read().replace('\n', ' ')
                 str_search_term = str_search_term.strip()
 
-        str_search_term = str_search_term[:-2]
+        # str_search_term = str_search_term[:-2]
         print('Searching for news of ' + str(company) + ' on Twitter using \'' + str_search_term + '\' ...')
 
         tweets_index = 0
@@ -287,16 +289,26 @@ for company, value in companies.items():
             tweets_index += 1
             duplicated_result = False
 
-            for single_tweet in search_results:
-                print('similarity = ' + str(similar(single_tweet, tweet.full_text)))
-                if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
-                    duplicated_result = True
+            print('==========================================')
+            print('==========================================')
+            print(tweet.created_at)
+            print('  ' + tweet.full_text)
+
+            if len(search_results) > 0:
+                for single_tweet in search_results:
+                    print('search_results contains ' + str(len(search_results)) + ' tweets')
+                    print('similarity = ' + str(similar(single_tweet, tweet.full_text)))
+                    if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
+                        print('There is similay tweet in the results already.')
+                        duplicated_result = True
+                        break
 
             if not duplicated_result:
+                print('Adding tweet to search_results...')
                 search_results.append(tweet.full_text)
-                print(tweet.created_at)
-                print('  ' + tweet.full_text)
-                print('Printing tweet to text file\n')
+                # print(tweet.created_at)
+                # print('  ' + tweet.full_text)
+                # print('Printing tweet to text file\n')
                 with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
                           '.txt', "w", encoding="utf-8") as tweet_file:
                     tweet_file.write(str(tweet.created_at))
