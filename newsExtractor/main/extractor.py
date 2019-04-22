@@ -207,6 +207,7 @@ for company, value in companies.items():
         result_tuple = tuple(news_struct.execute('$..text'))
         news_links = tuple(news_struct.execute('$..link'))
         news_titles = tuple(news_struct.execute('$..title'))
+        news_pub_dates = tuple(news_struct.execute('$..published'))
 
     # remove common words and tokenize
     stopWordsList = set(stopwords.words('english'))
@@ -236,9 +237,15 @@ for company, value in companies.items():
 
         with open(company_dir + keywords_dir + "news" + str(text_index+1) + ".txt", "w", encoding="utf-8") as news_text_file:
             # lets remove the first link which regards to the source link
-            print(str(news_links[text_index + 1]) + '\n\n', file=news_text_file)
-            print('***' + str(news_titles[text_index]) + '***\n', file=news_text_file)
-            print(str(result_tuple[text_index]), file=news_text_file)
+            # print(str(news_links[text_index + 1]) + '\n\n', file=news_text_file)
+            news_text_file.write(str(news_links[text_index + 1]))
+            news_text_file.write('\n')
+            news_text_file.write('_date: ' + str(news_pub_dates[text_index]))
+            news_text_file.write('\n\n')
+            # print('***' + str(news_titles[text_index]) + '***\n', file=news_text_file)
+            news_text_file.write('***' + str(news_titles[text_index]) + '***')
+            news_text_file.write('\n')
+            news_text_file.write(str(result_tuple[text_index]))
         with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
             for keyword in set_of_keywords:
                 print(keyword, file=keywords_text_file)
@@ -292,14 +299,15 @@ for company, value in companies.items():
             print('==========================================')
             print('==========================================')
             print(tweet.created_at)
+            print('Screen name = ' + str(tweet.user.screen_name))
             print('  ' + tweet.full_text)
 
+            print('search_results contains ' + str(len(search_results)) + ' tweets')
             if len(search_results) > 0:
                 for single_tweet in search_results:
-                    print('search_results contains ' + str(len(search_results)) + ' tweets')
                     print('similarity = ' + str(similar(single_tweet, tweet.full_text)))
                     if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
-                        print('There is similay tweet in the results already.')
+                        print('There is similar tweet in the results already.')
                         duplicated_result = True
                         break
 
@@ -311,47 +319,13 @@ for company, value in companies.items():
                 # print('Printing tweet to text file\n')
                 with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
                           '.txt', "w", encoding="utf-8") as tweet_file:
-                    tweet_file.write(str(tweet.created_at))
+                    tweet_file.write('_date: ' + str(tweet.created_at))
                     tweet_file.write('\n')
+                    tweet_file.write('_user: ' + str(tweet.user.screen_name))
+                    tweet_file.write('\n\n')
                     tweet_file.write(str(tweet.full_text))
 
 
 
-# # printing news and tweets from search result in a window for comparing
-# if param._display_results:
-#     window = Tk()
-#     window.title("Twitter News Processing")
-#     window.geometry('350x200')
-#     for company, value in companies.items():
-#         company_dir = news_dir + str(company) + '/'
-#         for article_index in range(param.num_of_articles):
-#             print('Opening ' + company_dir + 'news' + str(article_index + 1) + '.txt')
-#             with open(company_dir + "news" + str(article_index + 1) + ".txt", 'r', encoding="utf-8") as news_text_file:
-#                 str_news_text = str(news_text_file.read()).replace('\n', '')
-#             for tweets_index in range(param.num_of_tweets_search):
-#                 with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_tweet" + str(tweets_index+1) +
-#                           ".txt", 'r', encoding="utf-8") as tweet_text_file:
-#                     str_tweet_text = str(tweet_text_file.read()).replace('\n', '')
-#                     str_tweet_text = [re.sub(r"[^a-zA-Z0-9]+", ' ', k) for k in str_tweet_text.split("\n")]
-#
-#                 tab_control = ttk.Notebook(window)
-#                 tab1 = ttk.Frame(tab_control)
-#                 tab2 = ttk.Frame(tab_control)
-#
-#                 tab_control.add(tab1, text='News' + str(article_index+1))
-#                 txt1 = Text(tab1)
-#                 txt1.pack()
-#                 txt1.insert(END, str_news_text)
-#                 txt1.config(state=DISABLED)
-#                 txt1.grid(column=0, row=0)
-#
-#                 tab_control.add(tab2, text='Tweet' + str(tweets_index+1))
-#                 txt2 = Text(tab2)
-#                 txt2.pack()
-#                 txt2.insert(END, str_tweet_text)
-#                 txt2.config(state=DISABLED)
-#                 txt2.grid(column=0, row=0)
-#
-#                 tab_control.pack(expand=1, fill='both')
-#                 window.mainloop()
+
 

@@ -21,6 +21,6 @@ _search_by_hashtags = False
 # minimum similarity of tweets to be considered as duplicated
 _min_similar_rate = 0.7
 # Number of most frequent keywords to be used in tweets search
-mostFreqKeywords = 5
+mostFreqKeywords = 4
 # Searching tweets from date
 str_from_date = '2019-01-01'
