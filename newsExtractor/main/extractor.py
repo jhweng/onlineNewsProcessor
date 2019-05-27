@@ -5,6 +5,8 @@ import objectpath
 import os
 import tweepy
 import operator
+import datetime
+import dateutil.relativedelta
 from time import mktime
 # from tkinter import *
 # from tkinter import ttk
@@ -291,10 +293,18 @@ for company, value in companies.items():
         search_results = []
         if param._do_filter_retweets:
             str_search_term = str_search_term + str_retweet_filter
-        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term,
-                                   since=param.str_from_date).items(param.num_of_tweets_search):
+
+        last30Days = datetime.today()
+        last30Days = last30Days.replace(month=int(last30Days.month)-1)
+        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term).items():
             tweets_index += 1
             duplicated_result = False
+
+            # Check time window limit
+            date_obj = datetime.strptime(str(tweet.created_at), '%Y-%m-%d %H:%M:%S')
+            if date_obj.date() <= last30Days.date():
+                print('Time window reached!')
+                break
 
             print('==========================================')
             print('==========================================')
@@ -305,7 +315,7 @@ for company, value in companies.items():
             print('search_results contains ' + str(len(search_results)) + ' tweets')
             if len(search_results) > 0:
                 for single_tweet in search_results:
-                    print('similarity = ' + str(similar(single_tweet, tweet.full_text)))
+                    # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
                     if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
                         print('There is similar tweet in the results already.')
                         duplicated_result = True
@@ -327,5 +337,4 @@ for company, value in companies.items():
 
 
 
-
-
+# verificar se o conteudo do tweet contem keywords da query
