@@ -14,10 +14,10 @@ if (not api):
     print ("Can't Authenticate")
     sys.exit(-1)
 
-searchQuery = 'theoffice'  # this is what we're searching for
-maxTweets = 1000 # Some arbitrary large number
-tweetsPerQry = 100  # this is the max the API permits
-fName = 'tweets.txt' # We'll store the tweets in a text file.
+searchQuery = 'tariff us trump goods'  # this is what we're searching for
+maxTweets = 200   # Some arbitrary large number
+tweetsPerQry = 100    # this is the max the API permits
+fName = 'tweets.txt'   # We'll store the tweets in a text file.
 
 
 # If results from a specific ID onwards are reqd, set since_id to that ID.
@@ -53,9 +53,12 @@ with open(fName, 'w') as f:
             for tweet in new_tweets:
                 json1_data = json.loads(jsonpickle.encode(tweet._json, unpicklable=False))
                 if (not 'RT @' in json1_data['full_text']):
+                    print('--------------------------')
                     print(json1_data['created_at'])
                     print(json1_data['full_text'])
-                break
+                    f.write(jsonpickle.encode(tweet._json, unpicklable=False) +
+                            '\n')
+                # break
             tweetCount += len(new_tweets)
             print("Downloaded {0} tweets".format(tweetCount))
             max_id = new_tweets[-1].id

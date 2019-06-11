@@ -7,7 +7,9 @@ num_of_articles = 1
 # Minimum frequency of a word to be consider as keyword
 # minFrequence = 8
 # Number of tweets search
-num_of_tweets_search = 200
+num_of_tweets_search = 2000
+# Max tweets the API permits
+tweetsPerQry = 100
 # Toggle for cmd line runtime comments
 _comments = True
 # To extract new news from source

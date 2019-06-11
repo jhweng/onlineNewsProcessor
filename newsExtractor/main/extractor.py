@@ -5,6 +5,9 @@ import objectpath
 import os
 import tweepy
 import operator
+import sys
+import time
+import jsonpickle
 import datetime
 import dateutil.relativedelta
 from time import mktime
@@ -120,7 +123,7 @@ if param._do_extract_news:
                         # If the download for some reason fails (ex. 404) the script will continue downloading
                         # the next article.
                         print(e)
-                        print("continuing...")
+                        print("proceeding...")
                         continue
                     article['title'] = content.title
                     article['text'] = content.text
@@ -147,7 +150,7 @@ if param._do_extract_news:
                     content.parse()
                 except Exception as e:
                     print(e)
-                    print("continuing...")
+                    print("proceeding...")
                     continue
                 # Again, for consistency, if there is no found publish date the article will be skipped
                 # After 10 downloaded articles from the same newspaper without publish date, the company will be skipped
@@ -262,21 +265,27 @@ for company, value in companies.items():
 # ============  Extracting news from Twitter  ==================
 # ==============================================================
 
-auth = tweepy.OAuthHandler(twitterAuthentic.consumer_key, twitterAuthentic.consumer_secret)
-auth.set_access_token(twitterAuthentic.access_token, twitterAuthentic.access_token_secret)
-api = tweepy.API(auth)
+# auth = tweepy.OAuthHandler(twitterAuthentic.consumer_key, twitterAuthentic.consumer_secret)
+# auth.set_access_token(twitterAuthentic.access_token, twitterAuthentic.access_token_secret)
+# api = tweepy.API(auth)
 
+auth = tweepy.AppAuthHandler(twitterAuthentic.consumer_key, twitterAuthentic.consumer_secret)
+api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 
-user = api.me()
-print('Tweepy API user: ' + user.name)
+if (not api):
+    print("Can't Authenticate")
+    sys.exit(-1)
+
+# user = api.me()
+# print('Tweepy API user: ' + user.name)
 
 for company, value in companies.items():
     company_dir = news_dir + str(company) + '/'
 
     for article_index in range(param.num_of_articles):
-        print('Opening ' + company_dir + 'keywords' + str(article_index+1) + '.txt')
+        print('Opening ' + company_dir + keywords_dir + 'news' + str(article_index + 1) + '_keywords.txt')
         str_search_term = ''
-        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + "_keywords.txt", 'r', encoding="utf-8") as keyword_file:
+        with open(company_dir + keywords_dir + 'news' + str(article_index + 1) + '_keywords.txt', 'r', encoding="utf-8") as keyword_file:
             if param._search_by_hashtags:
                 str_search_term = '#'
                 str_search_term = str_search_term + keyword_file.read().replace('\n', ' #')
@@ -294,46 +303,111 @@ for company, value in companies.items():
         if param._do_filter_retweets:
             str_search_term = str_search_term + str_retweet_filter
 
-        last30Days = datetime.today()
-        last30Days = last30Days.replace(month=int(last30Days.month)-1)
-        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term).items():
-            tweets_index += 1
-            duplicated_result = False
+        timeWindow30d = datetime.today()
+        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + ".txt", 'r',
+                  encoding="utf-8") as news_file:
+            for line in news_file:
+                if '_date: ' in line:
+                    str_time_window = line[7:17]
+                    timeWindow30d = datetime.strptime(str_time_window, '%Y-%m-%d')
+                    print(timeWindow30d)
 
-            # Check time window limit
-            date_obj = datetime.strptime(str(tweet.created_at), '%Y-%m-%d %H:%M:%S')
-            if date_obj.date() <= last30Days.date():
-                print('Time window reached!')
+        timeWindow30d = timeWindow30d.replace(month=int(timeWindow30d.month)+1)
+
+        tweetCount = 0
+        while tweetCount < param.num_of_tweets_search:
+            try:
+                new_tweets = api.search(q=str_search_term, count=param.tweetsPerQry, tweet_mode='extended')
+
+                if not new_tweets:
+                    print("No more tweets found")
+                    break
+                for tweet in new_tweets:
+                    tweets_index += 1
+                    duplicated_result = False
+
+                    json1_data = json.loads(jsonpickle.encode(tweet._json, unpicklable=False))
+                    # if (not 'RT @' in json1_data['full_text']):
+                    # print('--------------------------')
+                    # print(json1_data['created_at'])
+                    # print(json1_data['full_text'])
+                    # Check time window limit
+                    date_obj = datetime.strptime(json1_data['created_at'], '%a %b %d %H:%M:%S +0000 %Y')
+                    if date_obj.date() >= timeWindow30d.date():
+                        print('Time window reached!')
+                    else:
+                        if len(search_results) > 0:
+                            # Check if there is similar tweet already stored in list
+                            for single_tweet in search_results:
+                                # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
+                                if similar(single_tweet, json1_data['full_text']) > param._min_similar_rate:
+                                    # print('There is similar tweet in the results already.')
+                                    duplicated_result = True
+                                    break
+
+                        if not duplicated_result:
+                            print('Adding tweet to search_results...')
+                            search_results.append(json1_data['full_text'])
+                            # print(tweet.created_at)
+                            # print('  ' + tweet.full_text)
+                            # print('Printing tweet to text file\n')
+                            with open(company_dir + keywords_dir + "news" + str(article_index + 1) + '_tweet' + str(
+                                    tweets_index) +
+                                      '.txt', "w", encoding="utf-8") as tweet_file:
+                                tweet_file.write('_date: ' + json1_data['created_at'])
+                                # tweet_file.write('\n')
+                                # tweet_file.write('_user: ' + str(tweet.user.screen_name))
+                                tweet_file.write('\n\n')
+                                tweet_file.write(json1_data['full_text'])
+
+                tweetCount += len(new_tweets)
+                print("Downloaded {0} tweets".format(tweetCount))
+                max_id = new_tweets[-1].id
+            except tweepy.TweepError as e:
+                # Just exit if any error
+                print("some error : " + str(e))
                 break
 
-            print('==========================================')
-            print('==========================================')
-            print(tweet.created_at)
-            print('Screen name = ' + str(tweet.user.screen_name))
-            print('  ' + tweet.full_text)
 
-            print('search_results contains ' + str(len(search_results)) + ' tweets')
-            if len(search_results) > 0:
-                for single_tweet in search_results:
-                    # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
-                    if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
-                        print('There is similar tweet in the results already.')
-                        duplicated_result = True
-                        break
 
-            if not duplicated_result:
-                print('Adding tweet to search_results...')
-                search_results.append(tweet.full_text)
-                # print(tweet.created_at)
-                # print('  ' + tweet.full_text)
-                # print('Printing tweet to text file\n')
-                with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
-                          '.txt', "w", encoding="utf-8") as tweet_file:
-                    tweet_file.write('_date: ' + str(tweet.created_at))
-                    tweet_file.write('\n')
-                    tweet_file.write('_user: ' + str(tweet.user.screen_name))
-                    tweet_file.write('\n\n')
-                    tweet_file.write(str(tweet.full_text))
+        # for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term).items():
+        #     tweets_index += 1
+        #     duplicated_result = False
+        #
+            # # Check time window limit
+            # date_obj = datetime.strptime(str(tweet.created_at), '%Y-%m-%d %H:%M:%S')
+            # if date_obj.date() <= timeWindow30d.date():
+            #     print('Time window reached!')
+            #     break
+        #
+        #     print('==========================================')
+        #     print('==========================================')
+        #     print(tweet.created_at)
+        #     print('Screen name = ' + str(tweet.user.screen_name))
+        #     print('  ' + tweet.full_text)
+        #
+        #     print('search_results contains ' + str(len(search_results)) + ' tweets')
+        #     if len(search_results) > 0:
+        #         for single_tweet in search_results:
+        #             # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
+        #             if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
+        #                 print('There is similar tweet in the results already.')
+        #                 duplicated_result = True
+        #                 break
+        #
+        #     if not duplicated_result:
+        #         print('Adding tweet to search_results...')
+        #         search_results.append(tweet.full_text)
+        #         # print(tweet.created_at)
+        #         # print('  ' + tweet.full_text)
+        #         # print('Printing tweet to text file\n')
+        #         with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
+        #                   '.txt', "w", encoding="utf-8") as tweet_file:
+        #             tweet_file.write('_date: ' + str(tweet.created_at))
+        #             tweet_file.write('\n')
+        #             tweet_file.write('_user: ' + str(tweet.user.screen_name))
+        #             tweet_file.write('\n\n')
+        #             tweet_file.write(str(tweet.full_text))
 
 
 
@@ -341,70 +415,3 @@ for company, value in companies.items():
 
 # https://bhaskarvk.github.io/2015/01/how-to-use-twitters-search-rest-api-most-effectively./
 
-# import sys
-# import jsonpickle
-# import os
-# import json
-# import tweepy
-#
-# # Replace the API_KEY and API_SECRET with your application's key and secret.
-# auth = tweepy.AppAuthHandler('XXXX', 'OOOOOOO')
-#
-# api = tweepy.API(auth, wait_on_rate_limit=True,
-# 				   wait_on_rate_limit_notify=True)
-#
-# if (not api):
-#     print ("Can't Authenticate")
-#     sys.exit(-1)
-#
-# searchQuery = 'theoffice'  # this is what we're searching for
-# maxTweets = 1000 # Some arbitrary large number
-# tweetsPerQry = 100  # this is the max the API permits
-# fName = 'tweets.txt' # We'll store the tweets in a text file.
-#
-#
-# # If results from a specific ID onwards are reqd, set since_id to that ID.
-# # else default to no lower limit, go as far back as API allows
-# sinceId = None
-#
-# # If results only below a specific ID are, set max_id to that ID.
-# # else default to no upper limit, start from the most recent tweet matching the search query.
-# max_id = -1
-#
-# tweetCount = 0
-# print("Downloading max {0} tweets".format(maxTweets))
-# with open(fName, 'w') as f:
-#     while tweetCount < maxTweets:
-#         try:
-#             if (max_id <= 0):
-#                 if (not sinceId):
-#                     new_tweets = api.search(q=searchQuery, count=tweetsPerQry, tweet_mode='extended')
-#                 else:
-#                     new_tweets = api.search(q=searchQuery, count=tweetsPerQry, tweet_mode='extended',
-#                                             since_id=sinceId)
-#             else:
-#                 if (not sinceId):
-#                     new_tweets = api.search(q=searchQuery, count=tweetsPerQry, tweet_mode='extended',
-#                                             max_id=str(max_id - 1))
-#                 else:
-#                     new_tweets = api.search(q=searchQuery, count=tweetsPerQry, tweet_mode='extended',
-#                                             max_id=str(max_id - 1),
-#                                             since_id=sinceId)
-#             if not new_tweets:
-#                 print("No more tweets found")
-#                 break
-#             for tweet in new_tweets:
-#                 json1_data = json.loads(jsonpickle.encode(tweet._json, unpicklable=False))
-#                 if (not 'RT @' in json1_data['full_text']):
-#                     print(json1_data['created_at'])
-#                     print(json1_data['full_text'])
-#                 break
-#             tweetCount += len(new_tweets)
-#             print("Downloaded {0} tweets".format(tweetCount))
-#             max_id = new_tweets[-1].id
-#         except tweepy.TweepError as e:
-#             # Just exit if any error
-#             print("some error : " + str(e))
-#             break
-#
-# print ("Downloaded {0} tweets, Saved to {1}".format(tweetCount, fName))
