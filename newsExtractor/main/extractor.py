@@ -18,6 +18,8 @@ from datetime import datetime
 from collections import defaultdict
 from collections import namedtuple
 from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.tokenize import word_tokenize
 from difflib import SequenceMatcher
 
 import constants
@@ -251,7 +253,13 @@ for company, value in companies.items():
             news_text_file.write('***' + str(news_titles[text_index]) + '***')
             news_text_file.write('\n')
             news_text_file.write(str(result_tuple[text_index]))
+
+# =====================================================================================================================
+#         APPLY STEMMING TO KEYWORDS
+# =====================================================================================================================
         with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
+            # ps = PorterStemmer()
+
             for keyword in set_of_keywords:
                 print(keyword, file=keywords_text_file)
         text_index += 1
@@ -331,7 +339,10 @@ for company, value in companies.items():
                     # print('--------------------------')
                     # print(json1_data['created_at'])
                     # print(json1_data['full_text'])
-                    # Check time window limit
+
+# =====================================================================================================================
+                    # CHECK TIME WINDOW
+# =====================================================================================================================
                     date_obj = datetime.strptime(json1_data['created_at'], '%a %b %d %H:%M:%S +0000 %Y')
                     if date_obj.date() >= timeWindow30d.date():
                         print('Time window reached!')
@@ -344,7 +355,9 @@ for company, value in companies.items():
                                     # print('There is similar tweet in the results already.')
                                     duplicated_result = True
                                     break
-
+# =====================================================================================================================
+#                         CHECK DUPLICATION
+# =====================================================================================================================
                         if not duplicated_result:
                             print('Adding tweet to search_results...')
                             search_results.append(json1_data['full_text'])
@@ -367,47 +380,6 @@ for company, value in companies.items():
                 # Just exit if any error
                 print("some error : " + str(e))
                 break
-
-
-
-        # for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term).items():
-        #     tweets_index += 1
-        #     duplicated_result = False
-        #
-            # # Check time window limit
-            # date_obj = datetime.strptime(str(tweet.created_at), '%Y-%m-%d %H:%M:%S')
-            # if date_obj.date() <= timeWindow30d.date():
-            #     print('Time window reached!')
-            #     break
-        #
-        #     print('==========================================')
-        #     print('==========================================')
-        #     print(tweet.created_at)
-        #     print('Screen name = ' + str(tweet.user.screen_name))
-        #     print('  ' + tweet.full_text)
-        #
-        #     print('search_results contains ' + str(len(search_results)) + ' tweets')
-        #     if len(search_results) > 0:
-        #         for single_tweet in search_results:
-        #             # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
-        #             if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
-        #                 print('There is similar tweet in the results already.')
-        #                 duplicated_result = True
-        #                 break
-        #
-        #     if not duplicated_result:
-        #         print('Adding tweet to search_results...')
-        #         search_results.append(tweet.full_text)
-        #         # print(tweet.created_at)
-        #         # print('  ' + tweet.full_text)
-        #         # print('Printing tweet to text file\n')
-        #         with open(company_dir + keywords_dir + "news" + str(article_index+1) + '_tweet' + str(tweets_index) +
-        #                   '.txt', "w", encoding="utf-8") as tweet_file:
-        #             tweet_file.write('_date: ' + str(tweet.created_at))
-        #             tweet_file.write('\n')
-        #             tweet_file.write('_user: ' + str(tweet.user.screen_name))
-        #             tweet_file.write('\n\n')
-        #             tweet_file.write(str(tweet.full_text))
 
 
 

@@ -2,6 +2,7 @@ pip install feedparser
 pip install newspaper3k
 pip install tweepy
 pip install objectpath
+pip install jsonpickle
 
 
 python console:
