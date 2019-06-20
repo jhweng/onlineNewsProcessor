@@ -22,7 +22,6 @@ from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize
 from difflib import SequenceMatcher
 
-import constants
 import twitterAuthentic
 import run_parameters as param
 
@@ -49,12 +48,16 @@ def remove_extra_chars(in_str):
 
 
 def is_valid_word(in_word):
-    return in_word != '-'
+    return (in_word != '-') and (in_word != 'said')
 
 
 def similar(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
+
+# ==============================================================
+# =================  Start of Pipeline  ========================
+# ==============================================================
 
 data = {}
 data['newspapers'] = {}
@@ -258,10 +261,16 @@ for company, value in companies.items():
 #         APPLY STEMMING TO KEYWORDS
 # =====================================================================================================================
         with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
-            # ps = PorterStemmer()
+            ps = PorterStemmer()
+            stemmingList = []
 
             for keyword in set_of_keywords:
-                print(keyword, file=keywords_text_file)
+                wordRoot = ps.stem(keyword)
+                if not (wordRoot in stemmingList):
+                    stemmingList.append(wordRoot)
+                    print(keyword, file=keywords_text_file)
+                else:
+                    print('There is similar words in keywords for ' + str(keyword))
         text_index += 1
         set_of_keywords = []
         frequency.clear()
@@ -311,16 +320,16 @@ for company, value in companies.items():
         if param._do_filter_retweets:
             str_search_term = str_search_term + str_retweet_filter
 
+        # initializing timeWindow30d value
         timeWindow30d = datetime.today()
         with open(company_dir + keywords_dir + "news" + str(article_index + 1) + ".txt", 'r',
                   encoding="utf-8") as news_file:
             for line in news_file:
                 if '_date: ' in line:
-                    str_time_window = line[7:17]
-                    timeWindow30d = datetime.strptime(str_time_window, '%Y-%m-%d')
-                    print(timeWindow30d)
-
-        timeWindow30d = timeWindow30d.replace(month=int(timeWindow30d.month)+1)
+                    str_published_date = line[7:17]
+                    published_date = datetime.strptime(str_published_date, '%Y-%m-%d')
+                    timeWindow30d = published_date.replace(month=int(published_date.month) + 1)
+                    print('Gathering tweets between {} and {}'.format(published_date, timeWindow30d))
 
         tweetCount = 0
         while tweetCount < param.num_of_tweets_search:
@@ -340,38 +349,43 @@ for company, value in companies.items():
                     # print(json1_data['created_at'])
                     # print(json1_data['full_text'])
 
+                    # break search loop after find tweet creation date before news published date
+                    date_obj = datetime.strptime(json1_data['created_at'], '%a %b %d %H:%M:%S +0000 %Y')
+                    if date_obj.date() <=published_date.date():
+                        print('Reached news published date. Breaking search loop...')
+                        break
 # =====================================================================================================================
                     # CHECK TIME WINDOW
 # =====================================================================================================================
-                    date_obj = datetime.strptime(json1_data['created_at'], '%a %b %d %H:%M:%S +0000 %Y')
-                    if date_obj.date() >= timeWindow30d.date():
-                        print('Time window reached!')
-                    else:
+                    if param.do_filter_timewindow and (date_obj.date() <= timeWindow30d.date()):
+                    #     print('Time window reached!')
+                    # else:
                         if len(search_results) > 0:
                             # Check if there is similar tweet already stored in list
                             for single_tweet in search_results:
                                 # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
-                                if similar(single_tweet, json1_data['full_text']) > param._min_similar_rate:
+                                if param.do_check_duplication and \
+                                        similar(single_tweet, json1_data['full_text']) > param._min_similar_rate:
                                     # print('There is similar tweet in the results already.')
                                     duplicated_result = True
                                     break
 # =====================================================================================================================
 #                         CHECK DUPLICATION
 # =====================================================================================================================
-                        if not duplicated_result:
-                            print('Adding tweet to search_results...')
-                            search_results.append(json1_data['full_text'])
-                            # print(tweet.created_at)
-                            # print('  ' + tweet.full_text)
-                            # print('Printing tweet to text file\n')
-                            with open(company_dir + keywords_dir + "news" + str(article_index + 1) + '_tweet' + str(
-                                    tweets_index) +
-                                      '.txt', "w", encoding="utf-8") as tweet_file:
-                                tweet_file.write('_date: ' + json1_data['created_at'])
-                                # tweet_file.write('\n')
-                                # tweet_file.write('_user: ' + str(tweet.user.screen_name))
-                                tweet_file.write('\n\n')
-                                tweet_file.write(json1_data['full_text'])
+                    if not duplicated_result:
+                        # print('Adding tweet to search_results...')
+                        search_results.append(json1_data['full_text'])
+                        # print(tweet.created_at)
+                        # print('  ' + tweet.full_text)
+                        # print('Printing tweet to text file\n')
+                        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + '_tweet' + str(
+                                tweets_index) +
+                                  '.txt', "w", encoding="utf-8") as tweet_file:
+                            tweet_file.write('_date: ' + json1_data['created_at'])
+                            # tweet_file.write('\n')
+                            # tweet_file.write('_user: ' + str(tweet.user.screen_name))
+                            tweet_file.write('\n\n')
+                            tweet_file.write(json1_data['full_text'])
 
                 tweetCount += len(new_tweets)
                 print("Downloaded {0} tweets".format(tweetCount))
