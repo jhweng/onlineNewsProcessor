@@ -44,11 +44,15 @@ def remove_extra_chars(in_str):
     out_str = out_str.replace(':', '')
     out_str = out_str.replace('(', '')
     out_str = out_str.replace(')', '')
+    out_str = out_str.replace('”', '')
     return out_str
 
 
 def is_valid_word(in_word):
-    return (in_word != '-') and (in_word != 'said')
+    return (in_word != '-') and \
+           (in_word != 'said') and \
+           (in_word != 'also') and \
+           (in_word != 'é')
 
 
 def similar(a, b):
@@ -66,6 +70,7 @@ news_dir = 'news/'
 keywords_dir = str(param.mostFreqKeywords) + '_keywords/'
 sources_urls = 'NewsPapers.json'
 str_retweet_filter = ' -filter:retweets'
+ps = PorterStemmer()
 
 
 # ==============================================================
@@ -220,7 +225,7 @@ for company, value in companies.items():
         news_pub_dates = tuple(news_struct.execute('$..published'))
 
     # remove common words and tokenize
-    stopWordsList = set(stopwords.words('english'))
+    stopWordsList = set(stopwords.words(param._lang))
     texts = [[word for word in document.lower().split() if word not in stopWordsList and is_valid_word(word)]
               for document in result_tuple]
 
@@ -228,8 +233,22 @@ for company, value in companies.items():
     text_index = 0
     set_of_keywords = []
     for text in texts:
+        # print(' '.join(text))
         for token in text:
-            frequency[token] += 1
+            token = remove_extra_chars(token)
+            # ============= Apply stemming ====================
+            if param.do_apply_stemming and (len(frequency) > 0):
+                similar_word_in_list = False
+                for listKeyword in frequency:
+                    if ps.stem(token) == ps.stem(listKeyword):
+                        similar_word_in_list = True
+                        frequency[listKeyword] += 1
+                        print(str(token) + ' counted as ' + str(listKeyword))
+
+                if not similar_word_in_list:
+                    frequency[token] += 1
+            else:
+                frequency[token] += 1
 
         # Select #n most used keywords and save to file
         for counter in range(param.mostFreqKeywords):
@@ -257,20 +276,13 @@ for company, value in companies.items():
             news_text_file.write('\n')
             news_text_file.write(str(result_tuple[text_index]))
 
-# =====================================================================================================================
-#         APPLY STEMMING TO KEYWORDS
-# =====================================================================================================================
-        with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as keywords_text_file:
-            ps = PorterStemmer()
-            stemmingList = []
+        with open(company_dir + keywords_dir + "news" + str(text_index+1) + "_keywords.txt", "w", encoding="utf-8") as\
+                  keywords_text_file:
 
+            # Saving keywords to file
             for keyword in set_of_keywords:
-                wordRoot = ps.stem(keyword)
-                if not (wordRoot in stemmingList):
-                    stemmingList.append(wordRoot)
-                    print(keyword, file=keywords_text_file)
-                else:
-                    print('There is similar words in keywords for ' + str(keyword))
+                print(keyword, file=keywords_text_file)
+
         text_index += 1
         set_of_keywords = []
         frequency.clear()
@@ -282,19 +294,12 @@ for company, value in companies.items():
 # ============  Extracting news from Twitter  ==================
 # ==============================================================
 
-# auth = tweepy.OAuthHandler(twitterAuthentic.consumer_key, twitterAuthentic.consumer_secret)
-# auth.set_access_token(twitterAuthentic.access_token, twitterAuthentic.access_token_secret)
-# api = tweepy.API(auth)
-
 auth = tweepy.AppAuthHandler(twitterAuthentic.consumer_key, twitterAuthentic.consumer_secret)
 api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 
-if (not api):
+if not api:
     print("Can't Authenticate")
     sys.exit(-1)
-
-# user = api.me()
-# print('Tweepy API user: ' + user.name)
 
 for company, value in companies.items():
     company_dir = news_dir + str(company) + '/'
@@ -320,84 +325,100 @@ for company, value in companies.items():
         if param._do_filter_retweets:
             str_search_term = str_search_term + str_retweet_filter
 
-        # initializing timeWindow30d value
+        # initializing timeWindow30d value and published date
         timeWindow30d = datetime.today()
+        published_date = datetime.today()
         with open(company_dir + keywords_dir + "news" + str(article_index + 1) + ".txt", 'r',
                   encoding="utf-8") as news_file:
             for line in news_file:
                 if '_date: ' in line:
                     str_published_date = line[7:17]
                     published_date = datetime.strptime(str_published_date, '%Y-%m-%d')
-                    timeWindow30d = published_date.replace(month=int(published_date.month) + 1)
-                    print('Gathering tweets between {} and {}'.format(published_date, timeWindow30d))
+                    timeWindow30d = published_date.replace(day=int(published_date.day) + param._timewindow_size)
+
+                    if param.do_filter_timewindow:
+                        print('Gathering tweets between {} and {}'.format(published_date, timeWindow30d))
+
+                    break
 
         tweetCount = 0
-        while tweetCount < param.num_of_tweets_search:
-            try:
-                new_tweets = api.search(q=str_search_term, count=param.tweetsPerQry, tweet_mode='extended')
+        savedTweetCount = 0
+        # sinceId = None
+        # max_id = -1
+        # while tweetCount < param.num_of_tweets_search:
+        #     try:
+        #         new_tweets = api.search(q=str_search_term, count=param.tweetsPerQry, tweet_mode='extended', sinceId = max_id)
+        #
+        #         if not new_tweets:
+        #             print("No more tweets found")
+        #             break
+        #         for tweet in new_tweets:
+        #             tweets_index += 1
+        #
+        #             json1_data = json.loads(jsonpickle.encode(tweet._json, unpicklable=False))
+        #
+        #             # break search loop after find tweet creation date before news published date
+        #             date_obj = datetime.strptime(json1_data['created_at'], '%a %b %d %H:%M:%S +0000 %Y')
+        #             if date_obj.date() <= published_date.date():
+        #                 print('Reached news published date. Breaking search loop...')
+        #                 break
 
-                if not new_tweets:
-                    print("No more tweets found")
-                    break
-                for tweet in new_tweets:
-                    tweets_index += 1
-                    duplicated_result = False
-
-                    json1_data = json.loads(jsonpickle.encode(tweet._json, unpicklable=False))
-                    # if (not 'RT @' in json1_data['full_text']):
-                    # print('--------------------------')
-                    # print(json1_data['created_at'])
-                    # print(json1_data['full_text'])
-
-                    # break search loop after find tweet creation date before news published date
-                    date_obj = datetime.strptime(json1_data['created_at'], '%a %b %d %H:%M:%S +0000 %Y')
-                    if date_obj.date() <=published_date.date():
-                        print('Reached news published date. Breaking search loop...')
-                        break
+        for tweet in tweepy.Cursor(api.search, tweet_mode='extended', q=str_search_term, lang='').\
+                                   items(param.num_of_tweets_search):
+            tweets_index += 1
 # =====================================================================================================================
-                    # CHECK TIME WINDOW
+                # CHECK TIME WINDOW
 # =====================================================================================================================
-                    if param.do_filter_timewindow and (date_obj.date() <= timeWindow30d.date()):
-                    #     print('Time window reached!')
-                    # else:
-                        if len(search_results) > 0:
-                            # Check if there is similar tweet already stored in list
-                            for single_tweet in search_results:
-                                # print('similarity with #' + str(search_results.index(single_tweet)+1) +' = ' + str(similar(single_tweet, tweet.full_text)))
-                                if param.do_check_duplication and \
-                                        similar(single_tweet, json1_data['full_text']) > param._min_similar_rate:
-                                    # print('There is similar tweet in the results already.')
-                                    duplicated_result = True
-                                    break
+            date_obj = datetime.strptime(str(tweet.created_at), '%Y-%m-%d %H:%M:%S')
+
+            if date_obj.date() < published_date.date():
+                print('News published date reached. Finalizing search...')
+                break
+
+            is_in_timewindow = True
+            # if param.do_filter_timewindow and (date_obj.date() > timeWindow30d.date()):
+            if param.do_filter_timewindow and (date_obj.date() > timeWindow30d.date()):
+                is_in_timewindow = False
+
 # =====================================================================================================================
 #                         CHECK DUPLICATION
 # =====================================================================================================================
-                    if not duplicated_result:
-                        # print('Adding tweet to search_results...')
-                        search_results.append(json1_data['full_text'])
-                        # print(tweet.created_at)
-                        # print('  ' + tweet.full_text)
-                        # print('Printing tweet to text file\n')
-                        with open(company_dir + keywords_dir + "news" + str(article_index + 1) + '_tweet' + str(
-                                tweets_index) +
-                                  '.txt', "w", encoding="utf-8") as tweet_file:
-                            tweet_file.write('_date: ' + json1_data['created_at'])
-                            # tweet_file.write('\n')
-                            # tweet_file.write('_user: ' + str(tweet.user.screen_name))
-                            tweet_file.write('\n\n')
-                            tweet_file.write(json1_data['full_text'])
+            duplicated_result = False
+            if (len(search_results) > 0) and param.do_check_duplication:
+                # Check if there is similar tweet already stored in list
+                for single_tweet in search_results:
+                    # if similar(single_tweet, json1_data['full_text']) > param._min_similar_rate:
+                    if similar(single_tweet, tweet.full_text) > param._min_similar_rate:
+                        # print('There is similar tweet in the results already.')
+                        duplicated_result = True
+                        break
 
-                tweetCount += len(new_tweets)
-                print("Downloaded {0} tweets".format(tweetCount))
-                max_id = new_tweets[-1].id
-            except tweepy.TweepError as e:
-                # Just exit if any error
-                print("some error : " + str(e))
-                break
+# =====================================================================================================================
+#                         SAVE RESULTS TO FILE
+# =====================================================================================================================
+            if (not duplicated_result) and is_in_timewindow:
+                # search_results.append(json1_data['full_text'])
+                search_results.append(tweet.full_text)
+                str_tweet_date = date_obj.date().strftime('%Y%m%d')
+                with open(company_dir + keywords_dir + str_tweet_date + "_news" + str(article_index + 1) + '_tweet' + str(
+                        tweets_index) +
+                          '.txt', "w", encoding="utf-8") as tweet_file:
+                    # tweet_file.write('_date: ' + json1_data['created_at'])
+                    tweet_file.write('_date: ' + str(tweet.created_at))
+                    tweet_file.write('\n\n')
+                    # tweet_file.write(json1_data['full_text'])
+                    tweet_file.write(str(tweet.full_text))
+                    savedTweetCount += 1
 
-
-
-# verificar se o conteudo do tweet contem keywords da query
-
-# https://bhaskarvk.github.io/2015/01/how-to-use-twitters-search-rest-api-most-effectively./
-
+            # tweetCount += len(new_tweets)
+            tweetCount += 1
+            print("Downloaded {0} tweets".format(tweetCount))
+            print("Saved {0} tweets to file".format(savedTweetCount))
+            # max_id = new_tweets[-1].id
+        # except tweepy.RateLimitError as e:
+        #     # Just exit if any error
+        #     print("Some error : " + str(e))
+        #     time.sleep(60 * 15)
+        #     continue
+        # except StopIteration:
+        #     break

@@ -4,10 +4,8 @@
 
 # Set the limit for number of articles to download
 num_of_articles = 1
-# Minimum frequency of a word to be consider as keyword
-# minFrequence = 8
 # Number of tweets search
-num_of_tweets_search = 2000
+num_of_tweets_search = 20000
 # Max tweets the API permits
 tweetsPerQry = 100
 # Toggle for cmd line runtime comments
@@ -23,10 +21,15 @@ _search_by_hashtags = False
 # minimum similarity of tweets to be considered as duplicated
 _min_similar_rate = 0.7
 # Number of most frequent keywords to be used in tweets search
-mostFreqKeywords = 5
+mostFreqKeywords = 3
 # Searching tweets from date
 str_from_date = '2019-01-01'
 # Duplication filter
 do_check_duplication = False
-# 30 days time window filter
+# Time window filter
 do_filter_timewindow = False
+# To apply stemming technique during keywords generation
+do_apply_stemming = False
+# Time window size in days
+_timewindow_size = 8
+_lang = 'english'
