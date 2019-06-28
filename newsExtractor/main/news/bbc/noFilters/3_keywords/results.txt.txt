@@ -1,0 +1,4 @@
+Total tweets: 3211
+Related: 1204
+Not Related: 2007
+Precisao da busca: 0.37496107131734663

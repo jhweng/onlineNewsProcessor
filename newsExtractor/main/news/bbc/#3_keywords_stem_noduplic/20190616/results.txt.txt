@@ -1,0 +1,4 @@
+Total tweets: 139
+Related: 31
+Not Related: 108
+Precisao da busca: 0.22302158273381295

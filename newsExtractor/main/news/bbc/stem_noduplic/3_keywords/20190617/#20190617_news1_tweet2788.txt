@@ -1,0 +1,9 @@
+_$not_related$
+
+_date: 2019-06-17 09:30:14
+
+teacher: i think you may have a mental health problem. 
+
+student: yes! you’re right! nobody has ever talked to me about this! i feel awful... can you get me some help? will the doctors help me now?
+
+teacher: er... no.

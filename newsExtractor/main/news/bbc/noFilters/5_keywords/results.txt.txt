@@ -1,0 +1,4 @@
+Total tweets: 50
+Related: 50
+Not Related: 0
+Precisao da busca: 1.0

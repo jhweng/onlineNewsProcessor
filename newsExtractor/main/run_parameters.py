@@ -25,11 +25,11 @@ mostFreqKeywords = 3
 # Searching tweets from date
 str_from_date = '2019-01-01'
 # Duplication filter
-do_check_duplication = False
+do_check_duplication = True
 # Time window filter
-do_filter_timewindow = False
+do_filter_timewindow = True
 # To apply stemming technique during keywords generation
-do_apply_stemming = False
+do_apply_stemming = True
 # Time window size in days
-_timewindow_size = 8
-_lang = 'english'
+_timewindow_size = 7
+_lang = 'portuguese'
